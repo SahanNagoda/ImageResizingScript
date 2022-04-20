@@ -1,22 +1,23 @@
 ﻿# Variables
-$directory = "C:\Temp\Media_file"    # Define the folder having the files to be resized
-$moveDir = "C:\temp\Media_file\temp"      # Define the folder to be used to store resized images
-$filesize = 276*354                   # Define the minimum size of the files which needs to be resized (300 KB)
+$directory = "C:\images"    # Define the folder having the files to be resized
+$moveDir = "C:\tempimages"      # Define the folder to be used to store resized images
+$filesize = 200kb                 # Define the minimum size of the files which needs to be resized (200 KB)
 $currentFileName = ""                  # A variable to hold the curerntly processing file name
 $currentResizedFileName = ""           # A variable to hold the curerntly processing resized file name
 
 # Actions
-Get-ChildItem $directory -include *jpg -Recurse |
-   Where-Object { $_.Length -gt $filesize} |
-   ForEach-Object { 
-      $currentFileName = $_.FullName
-      $currentResizedFileName = ($moveDir+"\resized_"+$_.Name)
-      ResizeImage $_.FullName 90 50 $currentResizedFileName
-      Remove-Item $currentFileName
-      Rename-Item $currentResizedFileName -NewName $currentFileName 
-      $currentFileName = ""
-      $currentResizedFileName = ""
-   }
+Get-ChildItem $directory -include *file -Recurse |
+Where-Object { $_.Length -gt $filesize } |
+ForEach-Object { 
+    $currentFileName = ($_.FullName)
+    $currentResizedFileName = ($moveDir + "\resized_" + $_.Name)
+    ResizeImage $_.FullName 90 50 $currentResizedFileName
+    Remove-Item $currentFileName
+    Move-Item $currentResizedFileName $currentFileName
+    # Rename-Item $currentResizedFileName -NewName $_.Name 
+    $currentFileName = ""
+    $currentResizedFileName = ""
+}
 
 # Support Functions
 # Based on the development work found at 
@@ -41,11 +42,11 @@ Function ResizeImage() {
     $encoderParams.Param[0] = New-Object System.Drawing.Imaging.EncoderParameter($ImageEncoder, $Quality)
  
     # get codec
-    $Codec = [System.Drawing.Imaging.ImageCodecInfo]::GetImageEncoders() | Where {$_.MimeType -eq 'image/jpeg'}
+    $Codec = [System.Drawing.Imaging.ImageCodecInfo]::GetImageEncoders() | Where { $_.MimeType -eq 'image/jpeg' }
  
     #compute the final ratio to use
-    $ratioX = ($cutDownRatioPerc/100)
-    $ratioY = ($cutDownRatioPerc/100)
+    $ratioX = ($cutDownRatioPerc / 100)
+    $ratioY = ($cutDownRatioPerc / 100)
  
     $ratio = $ratioY
     if ($ratioX -le $ratioY) {
