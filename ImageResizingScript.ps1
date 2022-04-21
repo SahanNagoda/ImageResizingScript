@@ -51,19 +51,22 @@ Function ResizeImage() {
 
 # Variables
 $directory = "C:\images"    # Define the folder having the files to be resized
-$moveDir = "C:\tempimages"      # Define the folder to be used to store resized images
-$filesize = 200kb                 # Define the minimum size of the files which needs to be resized (200 KB)
-$originalFileName = ""                  # A variable to hold the curerntly processing file name
-$resizedFileName = ""           # A variable to hold the curerntly processing resized file name
+$moveDir = "C:\tempimages"  # Define the folder to be used to store resized images
+$filesize = 300kb           # Define the minimum size of the files which needs to be resized (300 KB)
+$originalFileName = ""      # A variable to hold the curerntly processing file name
+$resizedFileName = ""       # A variable to hold the curerntly processing resized file name
+$quality = 90               # Image quality of the resized image
+$cutDownRatioPerc = 50      # Ratio to be reduced as a percentage. 50% means both width and height will be reduced by half.
+$numberOfDays = 30        # Define how many number of days old
 
 # Actions
 Get-ChildItem $directory -include *file -Recurse |
-Where-Object { $_.Length -gt $filesize } |
+Where-Object { $_.Length -gt $filesize -and $_.CreationTime -lt (Get-Date).AddDays(-$numberOfDays) } |
 ForEach-Object { 
     $originalFileName = ($_.FullName)
     $resizedFileName = ($moveDir + "\resized_" + $_.Name)
     Write-Output "Read file: $originalFileName"
-    ResizeImage $_.FullName 90 50 $resizedFileName
+    ResizeImage $_.FullName $quality $cutDownRatioPerc $resizedFileName
     Write-Output "$($_.Name) Image Resized"
     
     # Check backup file before delete the original
@@ -71,12 +74,13 @@ ForEach-Object {
         Write-Output "Removing Original file: $originalFileName"
         Remove-Item $originalFileName
         Write-Output "Moving Resized file to: $originalFileName from: $resizedFileName"
-        Move-Item $resizedFileName $originalFileName
+        Copy-Item $resizedFileName $originalFileName
         if (-not (Test-Path $originalFileName -PathType Leaf)) {
             break
             throw "Unable to find original"
         }
         else {
+            Remove-Item $resizedFileName
             Write-Host "Resize finished: $originalFileName" -ForegroundColor Green
         }
     }
