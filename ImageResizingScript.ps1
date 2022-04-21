@@ -1,24 +1,4 @@
-﻿# Variables
-$directory = "C:\images"    # Define the folder having the files to be resized
-$moveDir = "C:\tempimages"      # Define the folder to be used to store resized images
-$filesize = 200kb                 # Define the minimum size of the files which needs to be resized (200 KB)
-$currentFileName = ""                  # A variable to hold the curerntly processing file name
-$currentResizedFileName = ""           # A variable to hold the curerntly processing resized file name
-
-# Actions
-Get-ChildItem $directory -include *file -Recurse |
-Where-Object { $_.Length -gt $filesize } |
-ForEach-Object { 
-    $currentFileName = ($_.FullName)
-    $currentResizedFileName = ($moveDir + "\resized_" + $_.Name)
-    ResizeImage $_.FullName 90 50 $currentResizedFileName
-    Remove-Item $currentFileName
-    Move-Item $currentResizedFileName $currentFileName
-    # Rename-Item $currentResizedFileName -NewName $_.Name 
-    $currentFileName = ""
-    $currentResizedFileName = ""
-}
-
+﻿
 # Support Functions
 # Based on the development work found at 
 # https://www.lewisroberts.com/2015/01/18/powershell-image-resize-function/
@@ -42,7 +22,7 @@ Function ResizeImage() {
     $encoderParams.Param[0] = New-Object System.Drawing.Imaging.EncoderParameter($ImageEncoder, $Quality)
  
     # get codec
-    $Codec = [System.Drawing.Imaging.ImageCodecInfo]::GetImageEncoders() | Where { $_.MimeType -eq 'image/jpeg' }
+    $Codec = [System.Drawing.Imaging.ImageCodecInfo]::GetImageEncoders() | Where-Object { $_.MimeType -eq 'image/jpeg' }
  
     #compute the final ratio to use
     $ratioX = ($cutDownRatioPerc / 100)
@@ -68,3 +48,45 @@ Function ResizeImage() {
     $bmpResized.Dispose()
     $img.Dispose()
 }
+
+# Variables
+$directory = "C:\images"    # Define the folder having the files to be resized
+$moveDir = "C:\tempimages"      # Define the folder to be used to store resized images
+$filesize = 200kb                 # Define the minimum size of the files which needs to be resized (200 KB)
+$originalFileName = ""                  # A variable to hold the curerntly processing file name
+$resizedFileName = ""           # A variable to hold the curerntly processing resized file name
+
+# Actions
+Get-ChildItem $directory -include *file -Recurse |
+Where-Object { $_.Length -gt $filesize } |
+ForEach-Object { 
+    $originalFileName = ($_.FullName)
+    $resizedFileName = ($moveDir + "\resized_" + $_.Name)
+    Write-Output "Read file: $originalFileName"
+    ResizeImage $_.FullName 90 50 $resizedFileName
+    Write-Output "$($_.Name) Image Resized"
+    
+    # Check backup file before delete the original
+    if (Test-Path $resizedFileName -PathType Leaf) {
+        Write-Output "Removing Original file: $originalFileName"
+        Remove-Item $originalFileName
+        Write-Output "Moving Resized file to: $originalFileName from: $resizedFileName"
+        Move-Item $resizedFileName $originalFileName
+        if (-not (Test-Path $originalFileName -PathType Leaf)) {
+            break
+            throw "Unable to find original"
+        }
+        else {
+            Write-Host "Resize finished: $originalFileName" -ForegroundColor Green
+        }
+    }
+    else {
+        Write-Host "Unable to locate backup file: $resizedFileName" -ForegroundColor Red
+        Write-Host "Resized operation is skiped: $originalFileName" -ForegroundColor Red
+    }
+    
+    # Reset variables
+    $originalFileName = ""
+    $resizedFileName = ""
+}
+
