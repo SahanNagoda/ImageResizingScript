@@ -9,6 +9,17 @@
 # $cutDownRatioPerc   -> Ratio to be reduced as a percentage. 50% means both width and height will be reduced by half.
 # $OutputLocation     -> The file location (in format of folder\file_name) where the resized image should be stored
 #
+
+# Variables
+$directory = "C:\images"    # Define the folder having the files to be resized
+$moveDir = "C:\tempimages"  # Define the folder to be used to store resized images
+$filesize = 300kb           # Define the minimum size of the files which needs to be resized (300 KB)
+$originalFileName = ""      # A variable to hold the curerntly processing file name
+$resizedFileName = ""       # A variable to hold the curerntly processing resized file name
+$quality = 90               # Image quality of the resized image
+$cutDownRatioPerc = 50      # Ratio to be reduced as a percentage. 50% means both width and height will be reduced by half.
+$numberOfDays = 1          # Define how many number of days old
+$logfile = "C:\logs\ImageResizing.log" # Define the log file path 
 Function ResizeImage() {
     param([String]$ImagePath, [Int]$Quality = 90, [Int]$cutDownRatioPerc, [String]$OutputLocation)
  
@@ -49,15 +60,40 @@ Function ResizeImage() {
     $img.Dispose()
 }
 
-# Variables
-$directory = "C:\images"    # Define the folder having the files to be resized
-$moveDir = "C:\tempimages"  # Define the folder to be used to store resized images
-$filesize = 300kb           # Define the minimum size of the files which needs to be resized (300 KB)
-$originalFileName = ""      # A variable to hold the curerntly processing file name
-$resizedFileName = ""       # A variable to hold the curerntly processing resized file name
-$quality = 90               # Image quality of the resized image
-$cutDownRatioPerc = 50      # Ratio to be reduced as a percentage. 50% means both width and height will be reduced by half.
-$numberOfDays = 30        # Define how many number of days old
+Function Write-Log {
+    [CmdletBinding()]
+    Param(
+        [Parameter(Mandatory = $False)]
+        [ValidateSet("INFO", "WARN", "ERROR", "FATAL", "DEBUG")]
+        [String]
+        $Level = "INFO",
+
+        [Parameter(Mandatory = $True)]
+        [string]
+        $Message
+    )
+
+    if (-not(Test-Path -Path $logfile -PathType Leaf)) {
+        try {
+            $null = New-Item -ItemType File -Path $logfile -Force -ErrorAction Stop
+            Write-Host "The file [$logfile] has been created."
+        }
+        catch {
+            throw $_.Exception.Message
+        }
+    }
+
+    $Stamp = (Get-Date).toString("yyyy/MM/dd HH:mm:ss")
+    $Line = "[$Stamp] [$Level] : $Message"
+    If ($logfile) {
+        Add-Content $logfile -Value $Line
+    }
+    Else {
+        Write-Output $Line
+    }
+}
+
+
 
 # Actions
 Get-ChildItem $directory -include *file -Recurse |
@@ -65,15 +101,15 @@ Where-Object { $_.Length -gt $filesize -and $_.CreationTime -lt (Get-Date).AddDa
 ForEach-Object { 
     $originalFileName = ($_.FullName)
     $resizedFileName = ($moveDir + "\resized_" + $_.Name)
-    Write-Output "Read file: $originalFileName"
+    Write-Log "INFO" "Read file: $originalFileName"
     ResizeImage $_.FullName $quality $cutDownRatioPerc $resizedFileName
-    Write-Output "$($_.Name) Image Resized"
+    Write-Log "INFO" "$($_.Name) Image Resized"
     
     # Check backup file before delete the original
     if (Test-Path $resizedFileName -PathType Leaf) {
-        Write-Output "Removing Original file: $originalFileName"
+        Write-Log "INFO" "Removing Original file: $originalFileName"
         Remove-Item $originalFileName
-        Write-Output "Moving Resized file to: $originalFileName from: $resizedFileName"
+        Write-Log "INFO" "Moving Resized file to: $originalFileName from: $resizedFileName"
         Copy-Item $resizedFileName $originalFileName
         if (-not (Test-Path $originalFileName -PathType Leaf)) {
             break
@@ -81,12 +117,12 @@ ForEach-Object {
         }
         else {
             Remove-Item $resizedFileName
-            Write-Host "Resize finished: $originalFileName" -ForegroundColor Green
+            Write-Log "INFO" "Resize finished: $originalFileName"
         }
     }
     else {
-        Write-Host "Unable to locate backup file: $resizedFileName" -ForegroundColor Red
-        Write-Host "Resized operation is skiped: $originalFileName" -ForegroundColor Red
+        Write-Log "ERROR" "Unable to locate backup file: $resizedFileName"
+        Write-Log "ERROR" "Resized operation is skiped: $originalFileName"
     }
     
     # Reset variables
